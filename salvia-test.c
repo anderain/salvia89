@@ -71,6 +71,56 @@ struct {
 
 int iNumCharCases = sizeof(sCharCases) / sizeof(sCharCases[0]);
 
+struct {
+    const char* szFormat;
+    double      dValue;
+} sFloatCases[] = {
+    { "|%f|",           3.14 },
+    { "|%f|",           -3.14 },
+    { "|%.2f|",         3.14159 },
+    { "|%.2f|",         -3.14159 },
+    { "|%8.2f|",        3.14 },
+    { "|%-8.2f|",       3.14 },
+    { "|%08.2f|",       3.14 },
+    { "|%+8.2f|",       3.14 },
+    { "|%+08.2f|",      3.14 },
+    { "|%8.2f|",        -3.14 },
+    { "|%-8.2f|",       -3.14 },
+    { "|%08.2f|",       -3.14 },
+    { "|%+8.2f|",       -3.14 },
+    { "|%+08.2f|",      -3.14 },
+    { "|%.0f|",         3.14 },
+    { "|%.0f|",         3.5 },
+    { "|%f|",           0.0 },
+    { "|%.2f|",         0.0 },
+    { "|%.0f|",         0.0 },
+    { "|%8.2f|",        0.0 },
+    { "|%+8.2f|",       0.0 },
+    { "|%5.3f|",        3.14 },
+    { "|%5.3f|",        -3.14 },
+    { "|%.5f|",         1.5 },
+    { "|%f|",           1.0 },
+    { "|%f|",           -1.0 },
+    { "|%.2f|",         1.0 },
+    { "|%.2f|",         -1.0 },
+    { "|%10.3f|",       12.345 },
+    { "|%-10.3f|",      12.345 },
+    { "|%010.3f|",      12.345 },
+    { "|%10.3f|",       -12.345 },
+    { "|%+f|",          2.5 },
+    { "|%+f|",          -2.5 },
+    { "|%0-+12.5f|",    3.14 },
+    { "|%0-+12.5f|",    -3.14 },
+    { "|% 8.2f|",       3.14 },
+    { "|% 8.2f|",       -3.14 },
+    { "|%8.0f|",        3.14 },
+    { "|%8.0f|",        -3.14 },
+    { "|%+8.0f|",       3.14 },
+    { "|%+8.0f|",       -3.14 }
+};
+
+int iNumFloatCases = sizeof(sFloatCases) / sizeof(sFloatCases[0]);
+
 void testIntCases() {
     char strSalviaBuf[100];
     char strStdBuf[100];
@@ -143,10 +193,35 @@ void testCharCases() {
     }
 }
 
+void testFloatCases() {
+    char strSalviaBuf[100];
+    char strStdBuf[100];
+    int i;
+    int bIsPassed;
+
+    for (i = 0; i < iNumFloatCases; ++i) {
+        Salvia_Format(strSalviaBuf, sFloatCases[i].szFormat, sFloatCases[i].dValue);
+        sprintf(strStdBuf, sFloatCases[i].szFormat, sFloatCases[i].dValue);
+        bIsPassed = strcmp(strSalviaBuf, strStdBuf) == 0;
+        printf("%s[%s]%s Case %d, format = \"%s\"\n",
+            bIsPassed ? COLOR_GRN : COLOR_RED,
+            bIsPassed ? "Passed" : "Failed",
+            COLOR_NRM,
+            i + 1,
+            sFloatCases[i].szFormat
+        );
+        printf("    salvia = %s\n", strSalviaBuf);
+        printf("    stdio  = %s\n", strStdBuf);
+        ++iTestCount;
+        if (bIsPassed) ++iPassedCount;
+    }
+}
+
 int main(int argc, char* argv[]) {
     testIntCases();
     testStrCases();
     testCharCases();
+    testFloatCases();
     printf("Total %d cases, %d passed\n", iTestCount, iPassedCount);
     return 0;
 }

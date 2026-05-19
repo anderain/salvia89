@@ -17,6 +17,7 @@
  * @param szBuf Destination buffer that will receive the formatted string
  * @param szFormat Format string, supports:
  *                %d - Integer
+ *                %f - Float / Double
  *                %s - String 
  *                %c - Character
  *                %% - Percent sign
@@ -25,7 +26,7 @@
  * 
  * @example
  *  char buf[100];
- *  Salvia_Format(buf, "Integer:%d，String:%s", 42, "hello");
+ *  Salvia_Format(buf, "Integer:%d, Float:%.2f, String:%s", 42, 3.14, "hello");
  */
 int Salvia_Format(char* szBuf, const char* szFormat, ...);
 

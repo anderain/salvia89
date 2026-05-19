@@ -49,6 +49,7 @@ static void     Salvia_ClearFormatSpec      (FormatSpec* pFormatSpec);
 static char*    Salvia_WriteString          (char* szBuf, const char* szSource, int iStrLength, char cPadding, int iMaxWrite, int iWidth, int bIsLeftAlign);
 static int      Salvia_Atoi                 (const char* pSource);
 static char*    Salvia_ItoaWithPadding      (int iNum, char* pStrBuf, int iBase, int bUppercase, int bForceSign, int iMinDigit);
+static char*    Salvia_Ftoa                 (char* pStrBuf, double dNum, int iPrecision, int bForceSign, int bZeroPad, int iMinWidth);
 
 /* Reset temporary buffer pointer */
 #define ResetTempBuffer() (pCurTempBuf = szTempBuf)
@@ -203,6 +204,29 @@ static char*    Salvia_ItoaWithPadding      (int iNum, char* pStrBuf, int iBase,
                     }
                     Salvia_ItoaWithPadding(intValue, szTempBuf, 10, 0, bForceSign, iPrecision);
                 }
+                pCurBuf = Salvia_WriteString(
+                    pCurBuf,
+                    szTempBuf,
+                    Salvia_StrLen(szTempBuf),
+                    ' ',
+                    -1,
+                    sFormatSpec.iMinWidth,
+                    (sFormatSpec.uFlags & FLAG_LEFT_JUSTIFY) ? 1 : 0
+                );
+                break;
+            }
+            case 'f': { /* Float / Double */
+                double dblValue = va_arg(args, double);
+                int bForceSign = (sFormatSpec.uFlags & FLAG_FORCE_SIGN) ? 1 : 0;
+                int iPrecision = sFormatSpec.iPrecision;
+                int bZeroPad = (sFormatSpec.uFlags & FLAG_ZERO_PADDING) && !(sFormatSpec.uFlags & FLAG_LEFT_JUSTIFY) && sFormatSpec.iMinWidth > 0;
+
+                if (iPrecision < 0) {
+                    iPrecision = 6;
+                }
+
+                Salvia_Ftoa(szTempBuf, dblValue, iPrecision, bForceSign, bZeroPad, sFormatSpec.iMinWidth);
+
                 pCurBuf = Salvia_WriteString(
                     pCurBuf,
                     szTempBuf,
@@ -458,6 +482,118 @@ static char* Salvia_ItoaWithPadding(int iNum, char* pStrBuf, int iBase, int bUpp
     }
     /* Copy the numeric part */
     Salvia_StrCpy(pCurBuf, szBuf);
+
+    return pStrBuf;
+}
+
+/**
+ * @brief Double-to-string conversion with precision and signs
+ * 
+ * @param pStrBuf Buffer to hold the result
+ * @param dNum Double to convert
+ * @param iPrecision Number of decimal places
+ * @param bForceSign Whether to force a plus sign
+ * @param bZeroPad Whether to zero-pad between sign and digits
+ * @param iMinWidth Minimum field width (for zero-padding)
+ * @return char* Returns the result buffer pointer
+ */
+static char* Salvia_Ftoa(char* pStrBuf, double dNum, int iPrecision, int bForceSign, int bZeroPad, int iMinWidth) {
+    char        szIntBuf[NUM_STR_MAX];
+    char        szFracBuf[NUM_STR_MAX];
+    char        szDigitsBuf[NUM_STR_MAX];
+    char*       pCurBuf = pStrBuf;
+    char*       pDigitsCur;
+    int         bIsNegative = 0;
+    int         intPart;
+    int         iMultiplier;
+    int         i;
+    int         j;
+    double      frac;
+    int         fracPart;
+    int         iDigitsLen;
+    int         iHasSign;
+    int         iZeroPadding;
+
+    if (dNum < 0.0) {
+        bIsNegative = 1;
+        dNum = -dNum;
+    }
+
+    /* Apply rounding */
+    if (iPrecision > 0) {
+        double rounding = 0.5;
+        for (i = 0; i < iPrecision; i++) {
+            rounding /= 10.0;
+        }
+        dNum += rounding;
+    } else {
+        dNum += 0.5;
+    }
+
+    intPart = (int)dNum;
+
+    /* Format the digit part (integer + decimal point + fraction) without sign */
+    pDigitsCur = szDigitsBuf;
+    Salvia_ItoaNoSign(intPart, szIntBuf, 10, 0);
+    Salvia_StrCpy(pDigitsCur, szIntBuf);
+    pDigitsCur += Salvia_StrLen(szIntBuf);
+
+    if (iPrecision > 0) {
+        iMultiplier = 1;
+        for (i = 0; i < iPrecision; i++) {
+            iMultiplier *= 10;
+        }
+
+        frac = dNum - (double)intPart;
+        fracPart = (int)(frac * (double)iMultiplier);
+
+        /* Handle carry-over from rounding */
+        if (fracPart >= iMultiplier) {
+            fracPart = 0;
+        }
+
+        *pDigitsCur++ = '.';
+
+        /* Write fractional part with leading zeros */
+        for (j = iPrecision - 1; j >= 0; j--) {
+            szFracBuf[j] = (char)('0' + (fracPart % 10));
+            fracPart /= 10;
+        }
+        szFracBuf[iPrecision] = '\0';
+        Salvia_StrCpy(pDigitsCur, szFracBuf);
+        pDigitsCur += iPrecision;
+    }
+
+    *pDigitsCur = '\0';
+    iDigitsLen = Salvia_StrLen(szDigitsBuf);
+
+    /* Determine if there will be a sign character */
+    iHasSign = (bIsNegative || bForceSign) ? 1 : 0;
+
+    /* Calculate zero-padding needed */
+    if (bZeroPad && iMinWidth > iDigitsLen + iHasSign) {
+        iZeroPadding = iMinWidth - iDigitsLen - iHasSign;
+    } else {
+        iZeroPadding = 0;
+    }
+
+    /* Write sign */
+    if (bIsNegative) {
+        *pCurBuf++ = '-';
+    } else if (bForceSign) {
+        *pCurBuf++ = '+';
+    }
+
+    /* Write zero-padding */
+    for (i = 0; i < iZeroPadding; i++) {
+        *pCurBuf++ = '0';
+    }
+
+    /* Copy the digits */
+    Salvia_StrCpy(pCurBuf, szDigitsBuf);
+    pCurBuf += iDigitsLen;
+
+    *pCurBuf = '\0';
 
     return pStrBuf;
 }
